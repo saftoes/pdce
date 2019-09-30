@@ -1,0 +1,13 @@
+
+A = [sint.get_raw_input_from(0) for _ in range(10000)]
+B = [sint.get_raw_input_from(1) for _ in range(10000)]
+C = [sint.get_raw_input_from(2) for _ in range(10000)]
+D = [sint.get_raw_input_from(3) for _ in range(10000)]
+E = [sint.get_raw_input_from(4) for _ in range(10000)]
+
+result = 0
+for i in range(len(A)):
+    result = result + A[i]*B[i]*C[i]*D[i]*E[i]
+
+print_ln('[*] Total length = %s', len(A))
+print_ln('[*] Result = %s', result.reveal())

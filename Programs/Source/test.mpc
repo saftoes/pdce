@@ -1,0 +1,7 @@
+# (C) 2018 University of Bristol. See License.txt
+# cint: clear integers modulo p
+# sint: secret integers modulo p
+
+a = sint(33)
+
+a.reveal_to(1)

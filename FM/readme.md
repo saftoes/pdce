@@ -1,0 +1,2 @@
+## ReadMe
+I try two method to generate the random FM sketch and calculate them. One is use the farmhash to hash the unique item, the other is directly generate a hash of an item from random generator using openssl. The experiment show that the first one is faster 8 times than latter. So I rename the the second the method as PFM_slow, and do not include it in build src.

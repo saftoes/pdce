@@ -1,0 +1,19 @@
+# (C) 2018 University of Bristol. See License.txt
+
+def test(actual, expected):
+    if isinstance(actual, (sint, sgf2n)):
+        actual = actual.reveal()
+    print_ln('[*] expected %s, got %s', expected, actual)
+
+# cint: clear integers modulo p
+# sint: secret integers modulo p
+
+a = sint(1)
+b = sint(2)
+c = sint(5)
+
+test(a + b * c, 11)
+test(a + a * c, 6)
+test(a * b * c, 10)
+test(a * a * c, 5)
+test(a - b * c, -9)
