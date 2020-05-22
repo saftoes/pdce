@@ -6,7 +6,11 @@
 #include <unistd.h>
 #include <getopt.h>
 
-#define PREC 	300
+#include <sstream>
+#include <string>
+using namespace std;
+
+#define PREC 	100
 #define DIGIT	20
 
 #define _DYNAMIC_BOUND
@@ -82,50 +86,12 @@ void p(arb_t res,
 	arb_clear(threshold);
 	arb_clear(den);
 }
-/*
-void fast_arb_poly_pow_ui(arb_poly_t res,
-	arb_poly_t poly, mp_limb_t exp, slong prec) {
-
-	arb_poly_one(res);
-
-	int counter = 1;
-	struct timeval start, end;
-
-	for (mp_limb_t e = exp; e > 0; e >>= 1) {
-
-		printf("%d\n", counter++);
-		gettimeofday(&start, NULL);
-
-		if ((e & 0x1) == 0) {
-			arb_poly_pow_ui(poly, poly, 2, prec);
-
-			gettimeofday(&end, NULL);
-			printf("    Time used: %f ms\n", 
-				(end.tv_sec-start.tv_sec)*1000.0 + (end.tv_usec-start.tv_usec)/1000.0);
-
-			continue;
-		}
-
-		arb_poly_mul(res, res, poly, prec);
-
-		gettimeofday(&end, NULL);
-		printf("    Time used: %f ms\n", 
-			(end.tv_sec-start.tv_sec)*1000.0 + (end.tv_usec-start.tv_usec)/1000.0);
-		gettimeofday(&start, NULL);
-
-		arb_poly_pow_ui(poly, poly, 2, prec);
-
-		gettimeofday(&end, NULL);
-		printf("    Time used: %f ms\n", 
-			(end.tv_sec-start.tv_sec)*1000.0 + (end.tv_usec-start.tv_usec)/1000.0);
-
-	}
-}
-*/
 
 // Computing probability generating function of *big Z*
 void pgf(arb_poly_t poly,
 	mp_limb_t n, mp_limb_t w, mp_limb_t m, mp_limb_t delta) {
+
+	printf("pgf entering\n");
 
 	arb_t coeff;
 	arb_init(coeff);
@@ -194,8 +160,8 @@ mp_limb_t find_N0(mp_limb_t w, mp_limb_t m, double epsilon, mp_limb_t delta, mp_
 		for (ulong k = 0; k <= (ulong)((w - 1)*m); ++k) {
 			pmf(temp1, D1, k);	pmf(temp2, D2, k);		// temp1 = Pr[Z_N = K], temp2 = Pr[Z_{N+1} = K]
 
-			arb_mul(left, _epsilon_inv, temp2, PREC);
-			arb_sub(left, left, _delta, PREC);			// left = _epsilon_inv*Pr[Z_{N+1} = K] - _delta
+			arb_sub(left, temp2, _delta, PREC);
+			arb_mul(left, left, _epsilon_inv, PREC);	// left = _epsilon_inv*(Pr[Z_{N+1} = K] - _delta)
 
 			arb_mul(right, _epsilon, temp2, PREC);
 			arb_add(right, right, _delta, PREC);		// right = _epsilon*Pr[Z_{N+1} = K] + _delta
@@ -228,8 +194,8 @@ mp_limb_t find_N0(mp_limb_t w, mp_limb_t m, double epsilon, mp_limb_t delta, mp_
 		for (ulong k = 0; k <= (ulong)((w - 1)*m); ++k) {
 			pmf(temp1, D1, k);	pmf(temp2, D2, k);		// temp1 = Pr[Z_N = K], temp2 = Pr[Z_{N+1} = K]
 
-			arb_mul(left, _epsilon_inv, temp2, PREC);
-			arb_sub(left, left, _delta, PREC);			// left = _epsilon_inv*Pr[Z_{N+1} = K] - _delta
+			arb_sub(left, temp2, _delta, PREC);
+			arb_mul(left, left, _epsilon_inv, PREC);	// left = _epsilon_inv*(Pr[Z_{N+1} = K] - _delta)
 
 			arb_mul(right, _epsilon, temp2, PREC);
 			arb_add(right, right, _delta, PREC);		// right = _epsilon*Pr[Z_{N+1} = K] + _delta
@@ -259,37 +225,75 @@ mp_limb_t find_N0(mp_limb_t w, mp_limb_t m, double epsilon, mp_limb_t delta, mp_
 	return ceil;
 }
 
-/*
-// Debug subroutines
-void _check() {
+void show_100(mp_limb_t w, mp_limb_t m, double epsilon, mp_limb_t delta, mp_limb_t start,
+	FILE *fp) {
 
-	arb_t check1, check2, temp;
-	arb_init(check1);
-	arb_init(check2);
-	arb_init(temp);
+	arb_t _epsilon, _epsilon_inv, _delta, temp1, temp2, left, right;
+    
+	arb_poly_t D[101];
 
-	// Check p_{n,z}
-	arb_zero(check1);
-	arb_zero(check2);
-	for (ulong j = 0; j < 32; ++j) {
-		p(temp, 10000, j, PREC);
-		arb_add(check1, check1, temp, PREC);
-		arb_addmul_ui(check2, temp, j, PREC);
-	}
+	arb_init(_epsilon);
+    arb_init(_epsilon_inv);
+    arb_init(_delta);
+    arb_init(temp1);
+    arb_init(temp2);
+    arb_init(left);
+    arb_init(right);
+    for (int i = 0; i < 101; ++i)
+    	arb_poly_init(D[i]);
 
-	arb_set_d(temp, 0.77351*10000);
-	arb_log_base_ui(temp, temp, 2, PREC);
+    arb_set_d(temp1, epsilon);
+    arb_exp_invexp(_epsilon, _epsilon_inv, temp1, PREC);    // _epsilon = e^{epsilon}
+                                                            // _epsilon_inv = e^{-epsilon}
+    arb_set_si(temp1, -delta);
+    arb_set_ui(_delta, 2);
+    arb_pow(_delta, _delta, temp1, PREC);                   // _delta = 2^{-delta}
 
-	printf("\n[Sum] 1 ~= ");	arb_printd(check1, DIGIT);
-	printf("\n[Exp] ");			arb_printd(temp, DIGIT);
-	printf(" ~= ");				arb_printd(check2, DIGIT);
-	printf("\n");
+    for (ulong N = start; N < start + 101; ++N)
+    	pgf(D[N - start], N, w, m, PREC);
 
-	arb_clear(check1);
-	arb_clear(check2);
-	arb_clear(temp);
+    printf("D done\n");
+
+    bool flag;
+    for (int i = 0; i < 100; ++i) {
+    	fprintf(fp, "N = %ld: ", i + start);
+    	printf("N = %ld: ", i + start);
+
+    	flag = true;
+    	for (ulong k = 0; k <= (ulong)((w - 1)*m); ++k) {
+            pmf(temp1, D[i], k);
+            pmf(temp2, D[i + 1], k);      				// temp1 = Pr[Z_N = K], temp2 = Pr[Z_{N+1} = K]
+
+            arb_sub(left, temp2, _delta, PREC);
+            arb_mul(left, left, _epsilon_inv, PREC);    // left = _epsilon_inv*(Pr[Z_{N+1} = K] - _delta)
+
+            arb_mul(right, _epsilon, temp2, PREC);
+            arb_add(right, right, _delta, PREC);        // right = _epsilon*Pr[Z_{N+1} = K] + _delta
+
+            if (!(arb_ge(temp1, left) && arb_le(temp1, right))) {
+                flag = false;
+                fprintf(fp, "no\n");
+                printf("no\n");
+                break;
+            }
+        }
+        if (flag) {
+        	fprintf(fp, "yes\n");
+        	printf("yes\n");
+        }
+    }
+
+    arb_clear(_epsilon);
+    arb_clear(_epsilon_inv);
+    arb_clear(_delta);
+    arb_clear(temp1);
+    arb_clear(temp2);
+    arb_clear(left);
+    arb_clear(right);
+
+    for (int i = 0; i < 101; ++i)
+    	arb_poly_clear(D[i]);
 }
-*/
 
 int main(int argc, char *argv[])
 {
@@ -299,12 +303,14 @@ int main(int argc, char *argv[])
 		{"individual", 	0, NULL, 'i'},
 		{"aggregation", 0, NULL, 'a'},
 		{"search", 		0, NULL, 's'},
+		{"list",		0, NULL, 'l'},
 		// Program parameters
 		{"n", 		1, NULL, 'n'},
 		{"w", 		1, NULL, 'w'},
 		{"m", 		1, NULL, 'm'},
 		{"epsilon", 1, NULL, 'e'},
 		{"delta",	1, NULL, 'd'},
+		{"start",	1, NULL, 't'},
 		// Other parameters
 		{"out",	 	1, NULL, 'o'},
 		{"ceil", 	1, NULL, 'c'},
@@ -312,24 +318,28 @@ int main(int argc, char *argv[])
 	};
 
 	int op;
-	bool individual = false, aggregation = false, search = false;
+	bool individual = false, aggregation = false, search = false, list = false;
 	int n = -1, w = -1, m = -1;
 	double epsilon = -1;
 	int delta = 40;
+	int start = -1;
+
 	int ceil = 8192;
 	FILE *fp = NULL;
 
-	while((op = getopt_long(argc, argv, "iasn:w:m:e:d:o:c:h", opts, NULL)) != -1){
+	while((op = getopt_long(argc, argv, "iasln:w:m:e:d:t:o:c:h", opts, NULL)) != -1){
 		switch(op){
 			case 'i': 	individual = true; 				break;
 			case 'a': 	aggregation = true; 			break;
 			case 's':	search = true;					break;
+			case 'l':	list = true;					break;
 
 			case 'n':	n = atoi(optarg);				break;
 			case 'w':	w = atoi(optarg);				break;
 			case 'm':	m = atoi(optarg);				break;
 			case 'e':	epsilon = atof(optarg);			break;
 			case 'd':	delta = atoi(optarg);			break;
+			case 't':	start = atoi(optarg);			break;
 
 			case 'o':	fp = fopen(optarg, "w");		break;
 			case 'c':	ceil = atoi(optarg);			break;
@@ -339,8 +349,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (!individual && !aggregation && !search) {
-		printf("Incomplete command line args! Please specify at least one task: -i/-a/-s\n");
+	if (!individual && !aggregation && !search && !list) {
+		printf("Incomplete command line args! Please specify at least one task: -i/-a/-s/-l\n");
 		return -1;
 	}
 
@@ -420,6 +430,16 @@ int main(int argc, char *argv[])
 		printf("N0 = %ld\n", N0);
 
 		fclose(fp);
+		return 0;
+	}
+
+	if (list) {
+		if (w <= 0 || m <= 0 || epsilon <= 0 || delta <= 0 || start <= 0 || fp == NULL) {
+			printf("Invalid parameters for -s. Proper -w, -m, -e, -t, -o are required (-d is optional).\n");
+			return -1;
+		}
+
+		show_100(w, m, epsilon, delta, start, fp);
 		return 0;
 	}
 }
