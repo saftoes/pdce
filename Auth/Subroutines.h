@@ -72,6 +72,12 @@ void Create_Random_Seed(octet* seed,const Player& P,int len);
 void generate_challenge(vector<int>& challenge, const Player& P);
 
 
+template<class T>
+void Create_Random_Many(vector<T>& ans,const Player& P, int num);
+
+
+
+
 
 /* Functions to Commit to Seed Values 
  *  This also initialises the PRNG's in G

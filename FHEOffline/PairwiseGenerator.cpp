@@ -185,11 +185,12 @@ void PairwiseGenerator<FD>::run()
 
                 // Call F_rand to sample a set of random coefficients
                 vector<typename FD::T> rand_coeffs;
-                rand_coeffs.resize(randProducer.num_slots());
-                for (unsigned int i = 0; i < rand_coeffs.size(); ++i)
-                {
-                    Create_Random(rand_coeffs[i], P);
-                }
+                // rand_coeffs.resize(randProducer.num_slots());
+                // for (unsigned int i = 0; i < rand_coeffs.size(); ++i)
+                // {
+                //     Create_Random(rand_coeffs[i], P);
+                // }
+                Create_Random_Many(rand_coeffs, P, randProducer.num_slots());
 
                 for (auto m : multipliers)
                     m->multiply_alpha_and_add(randProducer.mac, randProducer.value,

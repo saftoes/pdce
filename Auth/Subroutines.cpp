@@ -152,6 +152,50 @@ void Create_Random(T& ans,const Player& P)
 }
 
 
+
+template<class T>
+void Create_Random_Many(vector<T>& ans,const Player& P, int num)
+{
+  PRNG G;
+  G.ReSeed();
+  vector<T> e(P.num_players()*num);
+  vector<octetStream> Comm_e(P.num_players());
+  vector<octetStream> Open_e(P.num_players());
+
+  octetStream ee;
+  for (int i = 0; i < num; ++i)
+  {
+    e[P.my_num() + i*P.num_players()].randomize(G);
+    e[P.my_num() + i*P.num_players()].pack(ee);
+  }
+  Commit(Comm_e[P.my_num()], Open_e[P.my_num()], ee, P.my_num());
+
+  P.Broadcast_Receive(Comm_e);
+  P.Broadcast_Receive(Open_e);
+
+  ans.resize(num);
+  for (int i = 0; i < num; ++i)
+    ans[i].assign(e[P.my_num() + i*P.num_players()]);
+
+  for (int i = 0; i < P.num_players(); ++i)
+  {
+    if (i != P.my_num())
+    {
+      if (!Open(ee, Comm_e[i], Open_e[i], i))
+      {
+        throw invalid_commitment();
+      }
+      for (int j = 0; j < num; ++j)
+      {
+        e[i + j*P.num_players()].unpack(ee);
+        ans[j].add(ans[j], e[i + j*P.num_players()]);
+      }
+    }
+  }
+}
+
+
+
 void Create_Random_Seed(octet* seed,const Player& P,int len)
 {
   PRNG G;
@@ -236,11 +280,15 @@ void generate_challenge(vector<int>& challenge, const Player& P)
 
 template void Commit_And_Open(vector<gf2n>& data,const Player& P);
 template void Create_Random(gf2n& ans,const Player& P);
+template void Create_Random_Many(vector<gf2n>& ans,const Player& P, int num);
 
 #ifdef USE_GF2N_LONG
 template void Commit_And_Open(vector<gf2n_short>& data,const Player& P);
 template void Create_Random(gf2n_short& ans,const Player& P);
+template void Create_Random_Many(vector<gf2n_short>& ans,const Player& P, int num);
 #endif
 
 template void Commit_And_Open(vector<gfp>& data,const Player& P);
 template void Create_Random(gfp& ans,const Player& P);
+template void Create_Random_Many(vector<gfp>& ans,const Player& P, int num);
+
