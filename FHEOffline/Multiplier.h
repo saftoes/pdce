@@ -49,6 +49,16 @@ public:
     size_t report_size(ReportType type);
     void report_size(ReportType type, MemoryUsage& res);
     size_t report_volatile() { return volatile_capacity; }
+
+    // Rand subroutines
+    void multiply_and_add(Plaintext_<FD>& res, const Ciphertext& C,
+            const Plaintext_<FD>& b,
+            const vector<typename FD::T>& rand_coeffs,
+            const typename FD::T& alphai);
+    void multiply_alpha_and_add(Plaintext_<FD>& res,
+            const Plaintext_<FD>& b,
+            const vector<typename FD::T>& rand_coeffs,
+            const typename FD::T& alphai);
 };
 
 #endif /* FHEOFFLINE_MULTIPLIER_H_ */

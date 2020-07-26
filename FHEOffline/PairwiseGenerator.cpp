@@ -8,6 +8,7 @@
 #include "FHEOffline/PairwiseGenerator.h"
 #include "FHEOffline/PairwiseMachine.h"
 #include "FHEOffline/Producer.h"
+#include "Auth/Subroutines.h"
 
 #include <NTL/ZZ.h>
 #include <NTL/ZZX.h>
@@ -181,15 +182,19 @@ void PairwiseGenerator<FD>::run()
                 timers["Plaintext multiplication"].start();
                 randProducer.mac.mul(machine.setup<FD>().alpha, randProducer.value);
                 timers["Plaintext multiplication"].stop();
-                
-                Rq_Element values({machine.setup<FD>().params, evaluation, evaluation});
 
-                timers["Plaintext conversion"].start();
-                values.from_vec(randProducer.value.get_poly());
-                timers["Plaintext conversion"].stop();
+                // Call F_rand to sample a set of random coefficients
+                vector<typename FD::T> rand_coeffs;
+                rand_coeffs.resize(randProducer.num_slots());
+                for (unsigned int i = 0; i < rand_coeffs.size(); ++i)
+                {
+                    Create_Random(rand_coeffs[i], P);
+                }
 
                 for (auto m : multipliers)
-                    m->multiply_alpha_and_add(randProducer.mac, values);
+                    m->multiply_alpha_and_add(randProducer.mac, randProducer.value,
+                        rand_coeffs,
+                        machine.setup<FD>().alphai);
 
                 randProducer.reset();
                 timers["Rand generation"].start();

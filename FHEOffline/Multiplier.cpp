@@ -9,6 +9,8 @@
 #include "FHEOffline/PairwiseGenerator.h"
 #include "FHEOffline/PairwiseMachine.h"
 
+#include <assert.h>
+
 template <class FD>
 Multiplier<FD>::Multiplier(int offset, PairwiseGenerator<FD>& generator) :
     generator(generator), machine(generator.machine),
@@ -102,3 +104,98 @@ void Multiplier<FD>::report_size(ReportType type, MemoryUsage& res)
 
 template class Multiplier<FFT_Data>;
 template class Multiplier<P2Data>;
+
+
+
+template <class FD>
+void Multiplier<FD>::multiply_and_add(Plaintext_<FD>& res, const Ciphertext& enc_a,
+        const Plaintext_<FD>& b,
+        const vector<typename FD::T>& rand_coeffs,
+        const typename FD::T& alphai)
+{
+    // Working as P_j
+    PRNG G;
+    G.ReSeed();
+    timers["Ciphertext multiplication"].start();
+    C.mul(enc_a, b);
+    timers["Ciphertext multiplication"].stop();
+    timers["Mask randomization"].start();
+    product_share.randomize(G);
+    bigint B = 6 * machine.setup<FD>().params.get_R();
+    B *= machine.setup<FD>().FieldD.get_prime();
+    B <<= machine.sec;
+    // slack
+    B *= NonInteractiveProof::slack(machine.sec,
+            machine.setup<FD>().params.phi_m());
+    B <<= machine.extra_slack;
+    rc.generateUniform(G, 0, B, B);
+    timers["Mask randomization"].stop();
+    timers["Encryption"].start();
+    other_pk.encrypt(mask, product_share, rc);
+    timers["Encryption"].stop();
+    timers["Multiplied ciphertext sending"].start();
+    octetStream o;
+    mask += C;
+
+    // Step 5/6 in the Input protocol of Overdrive
+    typename FD::T rho;
+    rho.assign_zero();
+    typename FD::T sigma_i;
+    sigma_i.assign_zero();
+    typename FD::T temp;
+
+    for (unsigned int i = 0; i < product_share.num_slots(); ++i)
+    {
+        temp.mul(rand_coeffs[i], b.element(i));
+        rho += temp;
+        temp.mul(rand_coeffs[i], product_share.element(i));
+        sigma_i += temp;
+    }
+
+    mask.pack(o);
+    rho.pack(o);
+    sigma_i.pack(o);
+    P.reverse_exchange(o);
+    C.unpack(o);
+    rho.unpack(o);
+    sigma_i.unpack(o);
+
+    // Working as P_i
+    timers["Multiplied ciphertext sending"].stop();
+    timers["Decryption"].start();
+    res -= product_share;
+    machine.sk.decrypt_any(product_share, C);
+    res += product_share;
+    timers["Decryption"].stop();
+
+    timers["Rand checking"].start();
+    typename FD::T check;
+    check.assign_zero();
+    for (unsigned int i = 0; i < product_share.num_slots(); ++i)
+    {
+        temp.mul(rand_coeffs[i], product_share.element(i));
+        check += temp;
+    }
+    check -= sigma_i;
+    temp.mul(alphai, rho);
+    check.sub(temp, check);
+
+    assert( check.is_zero() == true );
+
+    timers["Rand checking"].stop();
+
+
+    memory_usage.update("multiplied ciphertext", C.report_size(CAPACITY));
+    memory_usage.update("mask ciphertext", mask.report_size(CAPACITY));
+    memory_usage.update("product shares", product_share.report_size(CAPACITY));
+    memory_usage.update("masking random coins", rc.report_size(CAPACITY));
+}
+
+template <class FD>
+void Multiplier<FD>::multiply_alpha_and_add(Plaintext_<FD>& res,
+        const Plaintext_<FD>& b,
+        const vector<typename FD::T>& rand_coeffs,
+        const typename FD::T& alphai)
+{
+    multiply_and_add(res, other_enc_alpha, b, rand_coeffs, alphai);
+}
